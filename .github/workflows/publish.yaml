@@ -28,7 +28,7 @@ jobs:
           #!/usr/bin/env bash
           set -euxo pipefail
 
-          echo "pkgbuild=$(git diff --name-only HEAD HEAD~1 "*/.SRCINFO" | head -1 | xargs dirname)" >> $GITHUB_ENV
+          echo "pkgbuild=$(git diff --name-only HEAD HEAD~1 "*/PKGBUILD" | head -1 | xargs dirname)" >> $GITHUB_ENV
 
       - name: Publish package
         uses: KSXGitHub/github-actions-deploy-aur@master
