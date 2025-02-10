@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Freelens
+GenericName=Kubernetes IDE
+Comment=The Kubernetes IDE
+Icon=freelens
+Exec=freelens --no-sandbox --ozone-platform-hint=auto --enable-features=WebRTCPipeWireCapturer --enable-features=WaylandWindowDecorations %U
+Categories=System;
+StartupNotify=true
+StartupWMClass=Freelens
