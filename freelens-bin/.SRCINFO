@@ -1,7 +1,7 @@
 pkgbase = freelens-bin
 	pkgdesc = Free Open Source Kubernetes IDE
 	pkgver = 1.2.1
-	pkgrel = 2
+	pkgrel = 1
 	url = https://freelens.app/
 	arch = x86_64
 	arch = aarch64
