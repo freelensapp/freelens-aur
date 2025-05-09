@@ -1,24 +1,23 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    ":semanticCommitsDisabled"
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    ':semanticCommitsDisabled',
   ],
-  "addLabels": [
-    "renovate"
+  addLabels: [
+    'renovate',
   ],
-  "customManagers": [
+  customManagers: [
     {
-      // renovate hints after comment
-      "customType": "regex",
-      "extractVersionTemplate": "^v?(?<version>.*)$",
-      "fileMatch": [
-        "(^|/)PKGBUILD$"
+      customType: 'regex',
+      extractVersionTemplate: '^v?(?<version>.*)$',
+      managerFilePatterns: [
+        '/(^|/)PKGBUILD$/',
       ],
-      "matchStrings": [
-        "pkgver=(?<currentValue>\\S+)\\s*#\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+registryUrl=(?<registryUrl>\\S+))?\\s*\\n"
+      matchStrings: [
+        'pkgver=(?<currentValue>\\S+)\\s*#\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+registryUrl=(?<registryUrl>\\S+))?\\s*\\n',
       ],
-      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
-    }
-  ]
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
+    },
+  ],
 }
