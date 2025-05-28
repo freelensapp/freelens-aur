@@ -12,8 +12,8 @@
       // renovate hints after comment
       "customType": "regex",
       "extractVersionTemplate": "^v?(?<version>.*)$",
-      "fileMatch": [
-        "(^|/)PKGBUILD$"
+      "managerFilePatterns": [
+        "/(^|/)PKGBUILD$/"
       ],
       "matchStrings": [
         "pkgver=(?<currentValue>\\S+)\\s*#\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+registryUrl=(?<registryUrl>\\S+))?\\s*\\n"
