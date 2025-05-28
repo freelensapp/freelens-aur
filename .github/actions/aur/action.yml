@@ -1,13 +1,13 @@
-name: "Arch Linux User Repository (AUR) GitHub Action"
-description: ""
-author: "JamieMagee"
+name: Arch Linux User Repository (AUR) GitHub Action
+description: Update package checksums or publish packages to the AUR.
+author: JamieMagee
 branding:
-  icon: "package"
-  color: "blue"
+  icon: package
+  color: blue
 
 inputs:
   action:
-    description: "Which action to take. Can be 'updpkgsums' or 'publish'"
+    description: Which action to take. Can be 'updpkgsums' or 'publish'
     required: true
   pkgname:
     description: ""
@@ -15,7 +15,7 @@ inputs:
 
 runs:
   using: docker
-  image: "Dockerfile"
+  image: Dockerfile
   args:
     - ${{ inputs.action }}
     - ${{ inputs.pkgname }}

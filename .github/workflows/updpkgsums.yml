@@ -25,13 +25,14 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Find updated package
-        run: echo "pkgbuild=$(git diff --name-only origin/main origin/${GITHUB_HEAD_REF} "*PKGBUILD" | head -1 | xargs dirname)" >> $GITHUB_ENV
+        run: echo "pkgbuild=$(git diff --name-only origin/main origin/${GITHUB_HEAD_REF} "*PKGBUILD" | head -1 | xargs dirname)"
+          >> $GITHUB_ENV
 
       - name: Validate package
         if: ${{ env.pkgbuild != '' }}
         uses: ./.github/actions/aur
         with:
-          action: "updpkgsums"
+          action: updpkgsums
           pkgname: ${{ env.pkgbuild }}
 
       - name: Commit

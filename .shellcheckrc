@@ -1,0 +1,4 @@
+enable=all
+source-path=SCRIPTDIR
+disable=SC1091 # Not following: PKGBUILD: openBinaryFile: does not exist (No such file or directory)
+disable=SC2154 # X is referenced but not assigned.
