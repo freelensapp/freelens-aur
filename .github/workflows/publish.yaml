@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "*/PKGBUILD"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
