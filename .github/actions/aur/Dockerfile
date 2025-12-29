@@ -1,6 +1,6 @@
 FROM docker.io/library/archlinux:base-devel
 
-RUN pacman -Syu --needed --noconfirm pacman-contrib namcap git sudo && \
+RUN pacman -Syu --needed --noconfirm base-devel pacman-contrib namcap git sudo && \
   useradd -m builder && \
   echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
