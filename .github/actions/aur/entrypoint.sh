@@ -26,9 +26,9 @@ updpkgsums
 git diff PKGBUILD
 echo "::endgroup::"
 
-echo "::group::Installing depends using paru"
+echo "::group::Installing depends using yay"
 source PKGBUILD
-paru -Syu --removemake --needed --noconfirm "${depends[@]}" "${makedepends[@]}"
+yay -Syu --removemake --needed --noconfirm "${depends[@]}" "${makedepends[@]}"
 echo "::endgroup::"
 
 echo "::group::Running makepkg"
