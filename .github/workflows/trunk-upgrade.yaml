@@ -10,7 +10,7 @@ on:
     paths:
       - .trunk/**
   schedule:
-    - cron: 27 5 * * *
+    - cron: 2 6 * * *
   workflow_dispatch: {}
 
 permissions:
@@ -21,17 +21,59 @@ jobs:
   trunk-upgrade:
     name: trunk upgrade
 
-    runs-on: ubuntu-24.04
-    environment: automated
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-24.04-arm
+            arch: arm64
 
-    if: github.event_name != 'issue_comment' || (startsWith(github.event.issue.title, 'Automated trunk upgrade') && contains(github.event.comment.body,
+    runs-on: ${{ matrix.runs-on }}
+    environment: automated
+    timeout-minutes: 10
+
+    if: >-
+      github.event_name != 'issue_comment' || (startsWith(github.event.issue.title, 'Automated trunk upgrade') && contains(github.event.comment.body,
       '/rerun'))
+
+    env:
+      DO_NOT_TRACK: "1"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Setup pnpm
+        run: corepack enable
+
+      - name: Get pnpm cache directory
+        shell: bash
+        run: echo "pnpm_cache_dir=$(pnpm store path)" >> ${GITHUB_ENV}
+
+      - name: Use pnpm cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.pnpm_cache_dir }}
+          key: ${{ matrix.runs-on }}-${{ matrix.arch }}-node-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ matrix.runs-on }}-${{ matrix.arch }}-node-
+
+      - name: Install pnpm dependencies
+        id: install-pnpm
+        run: timeout 300 pnpm install --color=always --prefer-offline --frozen-lockfile
+        continue-on-error: true
+
+      - name: Install pnpm dependencies (retry)
+        if: steps.install-pnpm.outcome == 'failure'
+        run: timeout 300 pnpm install --color=always --prefer-offline --frozen-lockfile
 
       - name: Set up Trunk
         run: curl https://get.trunk.io -fsSL | bash -s -- -y
@@ -40,7 +82,7 @@ jobs:
         run: |
           trunk upgrade --yes-to-all --no-progress --ci --color | tee .github/update.log
           sed -e '/Downloading Trunk/,/Unpacking Trunk... done/d' -e 's/\x1b\[[0-9;]*m//g' -e 's/^\(  \)\{0,1\}  /\1- /' .github/update.log > .github/pr_body.log
-          perl -0777 -ne 'print join ", ", map {s/^- //r} grep {/^- /} split "\n"' .github/pr_body.log > .github/pr_title.log
+          perl -0777 -ne 'print join ", ", map {s/://gr} map {s/^- //r} grep {/^(-|cli) /} split "\n"' .github/pr_body.log > .github/pr_title.log
 
       - name: Check for changes
         run: |
@@ -76,7 +118,8 @@ jobs:
               --head automated/trunk-upgrade \
               --title "Automated trunk upgrade $(cat .github/pr_title.log) [skip ci]" \
               --body-file .github/pr_body.log \
-              --label automated
+              --label automated \
+              --label trunk
           else
             gh pr edit automated/trunk-upgrade \
               --title "Automated trunk upgrade $(cat .github/pr_title.log) [skip ci]" \
