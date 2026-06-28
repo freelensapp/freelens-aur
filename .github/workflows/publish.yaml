@@ -1,11 +1,6 @@
 name: Automated publish
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "*/PKGBUILD"
   workflow_dispatch: {}
 
 permissions:
