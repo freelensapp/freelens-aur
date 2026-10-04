@@ -69,7 +69,7 @@ jobs:
         github.event.review.author_association ||
         github.event.issue.author_association)
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 2
 
     outputs:
@@ -378,7 +378,7 @@ jobs:
       always() && needs.parse.result == 'success' && needs.parse.outputs.is-windows != 'true' && (needs.claude.result == 'failure'
       || needs.claude.result == 'cancelled')
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
 
     permissions:
@@ -444,7 +444,7 @@ jobs:
   prepare-windows:
     needs: parse
     if: always() && needs.parse.result == 'success' && needs.parse.outputs.is-windows == 'true'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
 
     permissions:
@@ -522,7 +522,7 @@ jobs:
   analyze-windows:
     needs: [parse, run-windows]
     if: always() && needs.run-windows.result != 'skipped'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
 
     permissions:
