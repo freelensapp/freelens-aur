@@ -2,9 +2,8 @@ name: Trunk Check
 
 on:
   push:
-    branches-ignore:
-      - automated/*
-      - renovate/*
+    branches:
+      - main
   pull_request:
     branches:
       - main
