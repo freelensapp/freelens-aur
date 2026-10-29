@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
-    "gitIgnoredAuthors: biome-migrate.yaml commits the migrated biome.jsonc to a Renovate branch as github-actions[bot]; without this, Renovate takes that commit for a manual edit, marks the pull request as edited and stops updating it."
+    "gitIgnoredAuthors: updpkgsums.yml (the checksums and .SRCINFO) and biome-migrate.yaml (the migrated biome.jsonc) commit to a Renovate branch as github-actions[bot]. Renovate checks both the author and the committer of every commit on its branch; without this, it takes such a commit for a manual edit, marks the pull request as edited and stops updating it."
   ],
   "extends": ["config:recommended", ":semanticCommitsDisabled"],
   "addLabels": ["renovate"],

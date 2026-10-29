@@ -1,5 +1,8 @@
 name: updpkgsums
 
+# Updates the checksums and .SRCINFO of a PKGBUILD that a pull request changes,
+# and commits them to the pull request branch. The job also runs on a pull
+# request that changes no PKGBUILD, as it is a required check.
 on:
   pull_request:
     types:
@@ -9,34 +12,79 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   updpkgsums:
     name: updpkgsums
 
     runs-on: ubuntu-26.04
+    environment: automated
+
+    env:
+      DO_NOT_TRACK: "1"
+      MESSAGE: Update checksums and .SRCINFO
+      SAME_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
+      # The head of the pull request rather than its merge with main, so that
+      # the commit matches the branch it is pushed to. GH_TOKEN rather than
+      # GITHUB_TOKEN, so that the pushed commit triggers the checks on the pull
+      # request again. A fork's pull request has no GH_TOKEN; it gets the
+      # read-only workflow token and only validates.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.GH_TOKEN || github.token }}
 
       - name: Find updated package
         run: |-
-          echo "pkgbuild=$(git diff --name-only origin/main origin/${GITHUB_HEAD_REF} "*PKGBUILD" | head -1 | xargs dirname)" >> $GITHUB_ENV
+          echo "pkgbuild=$(git diff --name-only origin/main...HEAD -- "*PKGBUILD" | head -1 | xargs -r dirname)" >> "$GITHUB_ENV"
 
       - name: Validate package
-        if: ${{ env.pkgbuild != '' }}
+        if: env.pkgbuild != ''
         uses: ./.github/actions/aur
         with:
           action: updpkgsums
           pkgname: ${{ env.pkgbuild }}
 
-      - name: Commit
-        if: ${{ env.pkgbuild != '' }}
-        uses: stefanzweifel/git-auto-commit-action@v7
+      - name: Check for changes
+        if: env.pkgbuild != ''
+        run: |-
+          if git diff --exit-code --stat -- "${pkgbuild}/PKGBUILD" "${pkgbuild}/.SRCINFO"; then
+            echo "changes=false" | tee -a "$GITHUB_ENV"
+          else
+            echo "changes=true" | tee -a "$GITHUB_ENV"
+          fi
+
+      # A run on a commit this job made must never find anything to update
+      # again; if it does, committing once more would only loop.
+      - name: Refuse to update twice
+        if: env.changes == 'true' && env.SAME_REPOSITORY == 'true'
+        run: |-
+          if [ "$(git log -1 --format=%s)" = "$MESSAGE" ]; then
+            echo "::error::${pkgbuild} still needs updating after it was updated and committed." >&2
+            exit 1
+          fi
+
+      # The author is listed in gitIgnoredAuthors in .renovaterc.json, so
+      # Renovate keeps treating its branch as unmodified and still rebases and
+      # updates it. If the branch moved meanwhile, the push is rejected as
+      # non-fast-forward, and the run on the newer commit takes over. The
+      # checkout of the head SHA leaves HEAD detached, so the push names the
+      # branch itself.
+      - name: Commit and push to the pull request branch
+        if: env.changes == 'true' && env.SAME_REPOSITORY == 'true'
+        uses: EndBug/add-and-commit@v11
         with:
-          file_pattern: "*/PKGBUILD */.SRCINFO"
+          github_token: ${{ secrets.GH_TOKEN }}
+          default_author: github_actions
+          add: ${{ env.pkgbuild }}/PKGBUILD ${{ env.pkgbuild }}/.SRCINFO
+          message: ${{ env.MESSAGE }}
+          push: origin HEAD:refs/heads/${{ github.head_ref }}

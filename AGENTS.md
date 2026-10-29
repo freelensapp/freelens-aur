@@ -31,7 +31,11 @@ workflow.
     (`workflow_dispatch`), not on a push to `main`.
   - `updpkgsums.yml` — Runs on PRs targeting `main`: detects changed
     PKGBUILD files, runs `updpkgsums` to update checksums and
-    `.SRCINFO`, and commits the result.
+    `.SRCINFO`, and commits the result to the PR branch as
+    `github-actions[bot]`. It pushes with `GH_TOKEN` rather than the
+    workflow token, so that the required checks run again on that commit;
+    a push with the workflow token starts no workflows and leaves the PR
+    blocked. A PR from a fork is only validated, never committed to.
   - `claude.yaml` — On-demand Claude Code assistant triggered by
     `@claude` in PRs and issues.
   - `claude-task.yaml` — On-demand Claude Code task via
@@ -269,6 +273,15 @@ Renovate opens PRs that only update `pkgver`. The `updpkgsums.yml`
 workflow then commits checksum and `.SRCINFO` updates. If the workflow
 doesn't run, check that the PR targets `main` and the workflow trigger
 conditions are met.
+
+Renovate checks both the author and the committer of every commit on its
+branch. A commit by anyone other than Renovate or an author listed in
+`gitIgnoredAuthors` of `.renovaterc.json` (`github-actions[bot]`, which
+`updpkgsums.yml` and `biome-migrate.yaml` commit as) makes it list the PR
+under "PR Edited (Blocked)" on the Dependency Dashboard and stop updating
+it. Renovate caches that result for the head commit of the branch, so a
+change of `gitIgnoredAuthors` does not unblock such a PR; ticking its
+checkbox on the Dependency Dashboard recreates the branch.
 
 ## Best Practices
 
