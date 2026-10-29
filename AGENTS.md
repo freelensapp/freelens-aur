@@ -9,8 +9,8 @@ This repository builds and publishes the
 The PKGBUILD wraps a pre-built `.AppImage` downloaded from Freelens
 GitHub releases — there is no compilation or source build step in this
 repo. Version bumps are automated via Renovate, and the package is
-pushed to the AUR via SSH on every push to `main` that touches the
-PKGBUILD.
+pushed to the AUR via SSH by the manually started `publish.yaml`
+workflow.
 
 ### Project Structure
 
@@ -27,8 +27,8 @@ PKGBUILD.
   `/usr/share/applications/freelens.desktop`.
 - **`.github/workflows/`** — CI/CD pipelines:
   - `publish.yaml` — Publishes the package to the AUR via
-    `KSXGitHub/github-actions-deploy-aur` on pushes to `main` that
-    modify the PKGBUILD.
+    `KSXGitHub/github-actions-deploy-aur`. It runs only on demand
+    (`workflow_dispatch`), not on a push to `main`.
   - `updpkgsums.yml` — Runs on PRs targeting `main`: detects changed
     PKGBUILD files, runs `updpkgsums` to update checksums and
     `.SRCINFO`, and commits the result.
@@ -38,13 +38,43 @@ PKGBUILD.
     `workflow_dispatch`.
   - `trunk-check.yaml` / `trunk-upgrade.yaml` — Linting and
     auto-upgrades via Trunk.
+  - `biome-migrate.yaml` — On a Renovate pull request that changes
+    `.trunk/trunk.yaml` or `biome.jsonc`, runs `biome migrate` for the Biome
+    version pinned in `.trunk/trunk.yaml` and commits the migrated
+    `biome.jsonc` to the same branch.
 - **`.github/actions/aur/`** — Composite action (`Dockerfile`,
   `action.yml`, `entrypoint.sh`) that runs `updpkgsums` inside an
   Arch Linux container. Used by the `updpkgsums.yml` workflow.
-- **`renovate.json5`** — Renovate configuration. Uses a custom regex
-  manager to extract the version from `# datasource=github-releases
-  depName=freelensapp/freelens` comments in the PKGBUILD and open
-  automated PRs when new upstream releases are detected.
+- **`.renovaterc.json`** — Renovate configuration. JSON rather than
+  JSON5, because Biome formats JSON but not JSON5, so the explanations
+  live in `description` fields instead of comments. Custom regex
+  managers extract the version from `# datasource=<datasource>
+  depName=<depName>` comments: after `pkgver=` in the PKGBUILD (to open
+  automated PRs when new upstream releases are detected), and in the
+  workflows and `.trunk/trunk.yaml`.
+- **`.trunk/trunk.yaml`** — Trunk configuration, the linter aggregator:
+  - `biome` — formats JSON, Markdown and YAML, and lints Markdown and YAML
+    (config: `biome.jsonc`), the same as upstream `freelensapp/freelens`.
+    Its version is pinned with a trailing `!`, so `trunk upgrade` leaves it
+    alone and Renovate bumps it to the newest npm release instead; Renovate
+    cannot run `biome migrate`, which is why `biome-migrate.yaml` exists.
+    `.renovaterc.json` lists `github-actions[bot]` in `gitIgnoredAuthors`,
+    so that its commit does not stop Renovate from updating the branch.
+  - `yamllint` — YAML (config: `.yamllint.yaml`), only for the rules Biome
+    does not have yet: `quoted-strings` and `octal-values`. Biome never adds
+    or removes quotes, so the two do not conflict. A YAML rule that Biome
+    gains goes to `biome.jsonc` (as `key-duplicates` of yamllint did, now
+    `noDuplicateMapKeys`), and yamllint goes once Biome covers the rest.
+  - `shellcheck` + `shfmt` — shell scripts (config: `.shellcheckrc`,
+    `.editorconfig`). shfmt runs without flags, because any formatting
+    flag makes it ignore `.editorconfig`; `simplify = true` there keeps
+    the simplification.
+  - `hadolint` — the `Dockerfile` of `.github/actions/aur/` (config:
+    `.hadolint.yaml`).
+  - `actionlint`, `trufflehog`, `git-diff-check` — workflows, secrets,
+    whitespace. actionlint is downloaded from the maintained fork
+    `kjanat/actionlint`, which continues the releases of
+    `rhysd/actionlint` after 1.7.12.
 
 ## Security
 
@@ -190,14 +220,15 @@ Makepkg's `updpkgsums` generates these automatically.
 Instead of manual version bumps, Renovate monitors the upstream GitHub
 releases and opens PRs when a new version is detected. The
 `updpkgsums.yml` workflow automatically updates checksums and
-`.SRCINFO` on those PRs. After merge to `main`, the `publish.yaml`
-workflow pushes the updated package to the AUR.
+`.SRCINFO` on those PRs. After merge to `main`, a maintainer starts the
+`publish.yaml` workflow, which pushes the updated package to the AUR.
 
 ## Troubleshooting Patterns
 
 ### PKGBUILD Fails to Build
 
 1. Verify the AppImage URLs are reachable:
+
    ```bash
    curl -I "https://github.com/freelensapp/freelens/releases/download/v${pkgver}/Freelens-${pkgver}-linux-amd64.AppImage"
    ```
@@ -282,6 +313,7 @@ When reviewing code and proposing fixes:
    ```
 
    You can generate this from the terminal with:
+
    ```bash
    git diff -u -- path/to/file
    ```
@@ -313,9 +345,9 @@ When reviewing code and proposing fixes:
    - Use GitHub's `suggestion` block for small targeted fixes so the PR
      author can accept the change with a single click:
 
-     ````suggestion
+     ```suggestion
      <same unified-diff format as shown above>
-     ````
+     ```
 
    - For larger multi-file changes, use `diff -u` blocks in a regular
      comment instead, with the proposed commit subject shown first
@@ -464,10 +496,18 @@ rather than guessing.
 
 ### Development Environment
 
-The GitHub Actions runner has a full Node.js + pnpm environment available.
-Dependencies are already installed (`pnpm install` has been run). The
-build step is skipped to save CI resources, but you can run build commands
-when needed for advanced tasks (e.g. type-checking, running tests).
+This repository has no Node.js project — there is no `package.json`, no
+`pnpm-lock.yaml`, and no dependency install step in the Claude workflow.
+Do not expect `pnpm`, `node`, or `npx` to be usable for project scripts;
+there are none. The runner is Ubuntu, not Arch Linux, so `makepkg` and
+`updpkgsums` are not available either; the `updpkgsums.yml` workflow runs
+them in an Arch Linux container on the pull request.
+
+What the runner does provide is trunk: `trunk` and its managed linters
+(`actionlint`, `biome`, `hadolint`, `shellcheck`, `shfmt`, `yamllint`) are
+on `PATH`. The install step is `continue-on-error`, so it may have failed.
+Verify a tool exists before relying on it, and never report a check as
+passing when it did not run.
 
 The `origin` remote is always `freelensapp/freelens-aur`, for fork PRs too:
 their commits are checked out through the pull ref. A PR from a fork runs in
@@ -477,11 +517,13 @@ PRs: Review Only" for how a fork PR that needs changes is handled.
 
 The following CLI tools are explicitly allowed in the workflow:
 
-- `pnpm` (all subcommands) — for validation, formatting, and builds
 - `git` (all subcommands) — for viewing changes, creating branches,
   committing, and pushing
 - `gh` (all subcommands) — for managing pull requests
-- `npx`, `node` — for running Node.js tools and scripts inline
+- `trunk`, `bash` — for linting and formatting every file type, and for
+  syntax-checking the PKGBUILD
+- `npx`, `node`, `pnpm` (all subcommands) — allowed, but there is no
+  Node.js project here; useful only for running an ad-hoc tool via `npx`
 - `yq`, `jq` — for YAML and JSON processing
 - `grep`, `rg` (ripgrep), `find`, `xargs` — for searching and iterating
 - `sed`, `awk`, `cut`, `tr` — for text transformation
@@ -494,10 +536,10 @@ The following CLI tools are explicitly allowed in the workflow:
 Before committing any changes, apply the same validation rules as human
 developers:
 
-- Run `pnpm trunk check` to validate all file types (or `trunk check` if
-  the trunk CLI is installed globally).
-- Validate the PKGBUILD: `bash -n freelens-bin/PKGBUILD` and
-  `cd freelens-bin && makepkg --printsrcinfo > /dev/null`.
+- Run `trunk check` to validate all file types. It only inspects changed
+  files by default; use `trunk check --all` after a broad change.
+- Validate the PKGBUILD syntax: `bash -n freelens-bin/PKGBUILD`. Leave
+  `makepkg --printsrcinfo` and the checksums to `updpkgsums.yml`.
 
 ## Getting Help
 

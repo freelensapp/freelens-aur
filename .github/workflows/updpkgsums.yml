@@ -15,7 +15,7 @@ jobs:
   updpkgsums:
     name: updpkgsums
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -25,8 +25,8 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Find updated package
-        run: echo "pkgbuild=$(git diff --name-only origin/main origin/${GITHUB_HEAD_REF} "*PKGBUILD" | head -1 | xargs dirname)"
-          >> $GITHUB_ENV
+        run: |-
+          echo "pkgbuild=$(git diff --name-only origin/main origin/${GITHUB_HEAD_REF} "*PKGBUILD" | head -1 | xargs dirname)" >> $GITHUB_ENV
 
       - name: Validate package
         if: ${{ env.pkgbuild != '' }}
