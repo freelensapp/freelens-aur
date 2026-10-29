@@ -30,18 +30,12 @@
 #     maintainer (see "Fork PRs: Review Only" in AGENTS.md).
 #
 # Jobs:
-#   1. parse – always ubuntu-24.04-arm, parses [model:xxx], [effort:xxx] and [runs-on:xxx]
+#   1. parse – always ubuntu-26.04-arm, parses [model:xxx], [effort:xxx] and [runs-on:xxx]
 #      from the trigger text and detects whether the pull request is from a fork
 #
-#   Linux / macOS path:
 #   2. claude – runs on the parsed runner, checks out code, invokes Claude Code
 #   3. report-failure – last resort: if claude failed or timed out, re-run Claude
 #      to diagnose the failure and fix any stalled tracking comment (feedback only)
-#
-#   Windows path (Claude Code action does not support Windows natively):
-#   2. prepare-windows – Claude writes a PowerShell script, uploads as artifact
-#   3. run-windows – executes the script on the selected Windows runner
-#   4. analyze-windows – Claude reads the output and posts a summary comment
 
 name: Claude
 
@@ -69,15 +63,13 @@ jobs:
         github.event.review.author_association ||
         github.event.issue.author_association)
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 2
 
     outputs:
       model: ${{ steps.parse.outputs.model }}
       effort-arg: ${{ steps.parse.outputs.effort-arg }}
       runs-on: ${{ steps.parse.outputs.runs-on }}
-      is-windows: ${{ steps.parse.outputs.is-windows }}
-      text: ${{ steps.parse.outputs.text }}
       is-fork: ${{ steps.fork.outputs.is-fork }}
       pr-number: ${{ steps.fork.outputs.pr-number }}
 
@@ -110,7 +102,7 @@ jobs:
         run: |
           DEFAULT_MODEL="claude-opus-5-5[1m]"
           DEFAULT_EFFORT="high"
-          DEFAULT_RUNS_ON="ubuntu-24.04-arm"
+          DEFAULT_RUNS_ON="ubuntu-26.04-arm"
           # ISSUE_BODY is set only for the issues event, where the issue
           # author is the collaborator who passed the trigger check.
           TEXT="${COMMENT_BODY}${REVIEW_BODY}${ISSUE_BODY}"
@@ -191,12 +183,10 @@ jobs:
           RUNS_ON_ALIAS="${RUNS_ON_ALIAS:-}"
 
           case "$RUNS_ON_ALIAS" in
-            ubuntu-24.04|ubuntu|linux|linux-x64)        RUNS_ON="ubuntu-24.04" ;;
-            ubuntu-24.04-arm|ubuntu-arm|linux-arm|linux-arm64) RUNS_ON="ubuntu-24.04-arm" ;;
-            macos-15|macos|macos-arm64)                  RUNS_ON="macos-15" ;;
-            macos-15-intel|macos-intel|macos-x64)        RUNS_ON="macos-15-intel" ;;
-            windows-11-arm|windows-arm|windows-arm64)    RUNS_ON="windows-11-arm" ;;
-            windows-2025|windows|windows-x64)            RUNS_ON="windows-2025" ;;
+            ubuntu-24.04)                               RUNS_ON="ubuntu-24.04" ;;
+            ubuntu-24.04-arm)                           RUNS_ON="ubuntu-24.04-arm" ;;
+            ubuntu-26.04|ubuntu|linux|linux-x64)        RUNS_ON="ubuntu-26.04" ;;
+            ubuntu-26.04-arm|ubuntu-arm|linux-arm|linux-arm64) RUNS_ON="ubuntu-26.04-arm" ;;
             "")                                          RUNS_ON="$DEFAULT_RUNS_ON" ;;
             *)
               echo "Ignoring unknown runner: '$RUNS_ON_ALIAS'"
@@ -207,20 +197,6 @@ jobs:
           echo "Resolved runs-on: '${RUNS_ON_ALIAS:-<none>}' -> $RUNS_ON"
           echo "runs-on=$RUNS_ON" >> "$GITHUB_OUTPUT"
 
-          # --- is-windows ---
-          case "$RUNS_ON" in
-            windows-*) IS_WINDOWS="true" ;;
-            *)         IS_WINDOWS="false" ;;
-          esac
-          echo "is-windows=$IS_WINDOWS" >> "$GITHUB_OUTPUT"
-
-          # --- text (for Windows jobs that need the original prompt) ---
-          # A random delimiter, so that a line of the text cannot close the
-          # block early and write further outputs.
-          DELIMITER="TEXT_EOF_$(openssl rand -hex 16)"
-          echo "text<<$DELIMITER" >> "$GITHUB_OUTPUT"
-          echo "$TEXT" >> "$GITHUB_OUTPUT"
-          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
         env:
           COMMENT_BODY: ${{ github.event.comment.body || '' }}
           REVIEW_BODY: ${{ github.event.review.body || '' }}
@@ -248,12 +224,11 @@ jobs:
           echo "pr-number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number)
-            || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) || '' }}
 
   claude:
     needs: parse
-    if: always() && needs.parse.result == 'success' && needs.parse.outputs.is-windows != 'true'
+    if: always() && needs.parse.result == 'success'
 
     runs-on: ${{ needs.parse.outputs.runs-on }}
     timeout-minutes: 120
@@ -278,8 +253,7 @@ jobs:
         if: needs.parse.outputs.pr-number != ''
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.parse.outputs.is-fork != 'true' && github.event.pull_request.head.ref || format('refs/pull/{0}/head',
-            needs.parse.outputs.pr-number) }}
+          ref: ${{ needs.parse.outputs.is-fork != 'true' && github.event.pull_request.head.ref || format('refs/pull/{0}/head', needs.parse.outputs.pr-number) }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -336,7 +310,7 @@ jobs:
             --model "${{ needs.parse.outputs.model }}"
             ${{ needs.parse.outputs.effort-arg }}
             --fallback-model claude-opus-5
-            --max-turns 200
+            --max-turns 400
             --allowedTools "Read" "Write" "Edit" "Glob" "Grep" "Task" "WebSearch" "WebFetch" "BashOutput" "KillShell" "Bash(trunk:*)" "Bash(bash:*)" "Bash(pnpm:*)" "Bash(npx:*)" "Bash(node:*)" "Bash(git:*)" "Bash(gh:*)" "Bash(yq:*)" "Bash(jq:*)" "Bash(grep:*)" "Bash(rg:*)" "Bash(sed:*)" "Bash(awk:*)" "Bash(cut:*)" "Bash(tr:*)" "Bash(sort:*)" "Bash(uniq:*)" "Bash(cat:*)" "Bash(head:*)" "Bash(tail:*)" "Bash(wc:*)" "Bash(find:*)" "Bash(xargs:*)" "Bash(ls:*)" "Bash(tree:*)" "Bash(mkdir:*)" "Bash(touch:*)" "Bash(cp:*)" "Bash(mv:*)" "Bash(rm:*)" "Bash(tee:*)" "Bash(echo:*)"
             --append-system-prompt-file /tmp/AGENTS.md
 
@@ -375,10 +349,9 @@ jobs:
   report-failure:
     needs: [parse, claude]
     if: >-
-      always() && needs.parse.result == 'success' && needs.parse.outputs.is-windows != 'true' && (needs.claude.result == 'failure'
-      || needs.claude.result == 'cancelled')
+      always() && needs.parse.result == 'success' && (needs.claude.result == 'failure' || needs.claude.result == 'cancelled')
 
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
 
     permissions:
@@ -438,133 +411,3 @@ jobs:
               - Event:       ${{ github.event_name }}
               - Issue/PR #:  ${{ github.event.issue.number || github.event.pull_request.number }}
               - Job result:  ${{ needs.claude.result }}
-
-  # ── Windows path: Claude writes PS script → execute on Windows → Claude analyzes ──
-
-  prepare-windows:
-    needs: parse
-    if: always() && needs.parse.result == 'success' && needs.parse.outputs.is-windows == 'true'
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
-
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-
-    steps:
-      - name: Checkout (default branch)
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |-
-            --model "${{ needs.parse.outputs.model }}"
-            ${{ needs.parse.outputs.effort-arg }}
-            --fallback-model claude-opus-5
-            --max-turns 50
-            --allowedTools "Write"
-          prompt: |-
-            Based on the following request from a GitHub comment, write a PowerShell
-            script named verify.ps1 that accomplishes the task on a Windows runner.
-
-            The script must be self-contained and idempotent.
-            After completing the work, save a JSON summary to result.json with the
-            keys: exitCode (number), stdout (string), stderr (string), summary
-            (string – a human-readable summary of what happened).
-
-            Request:
-
-            ${{ needs.parse.outputs.text }}
-
-      - name: Upload PowerShell script
-        uses: actions/upload-artifact@v7
-        with:
-          name: ps-script
-          path: verify.ps1
-
-  run-windows:
-    needs: [parse, prepare-windows]
-    if: always() && needs.prepare-windows.result == 'success'
-    runs-on: ${{ needs.parse.outputs.runs-on }}
-    timeout-minutes: 30
-
-    permissions:
-      contents: read
-      actions: read
-
-    steps:
-      - name: Checkout (default branch)
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Download PowerShell script
-        uses: actions/download-artifact@v8
-        with:
-          name: ps-script
-
-      - name: Execute verification
-        shell: pwsh
-        run: ./verify.ps1
-        continue-on-error: true
-
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: verify-results
-          path: result.json
-
-  analyze-windows:
-    needs: [parse, run-windows]
-    if: always() && needs.run-windows.result != 'skipped'
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
-
-    permissions:
-      pull-requests: write
-      issues: write
-      contents: read
-      actions: read
-      id-token: write
-
-    steps:
-      - name: Checkout (default branch)
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Download results from Windows
-        uses: actions/download-artifact@v8
-        with:
-          name: verify-results
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |-
-            --model "${{ needs.parse.outputs.model }}"
-            --fallback-model claude-opus-5
-            --max-turns 30
-            --allowedTools "Read" "Grep" "Bash(gh:*)" "Bash(jq:*)" "Bash(cat:*)"
-          prompt: |-
-            Read the file result.json (output from a test executed on a Windows
-            runner). Write a short summary as a GitHub comment on the PR or issue
-            that triggered this workflow. Include: whether it succeeded, the exit
-            code, and any suspicious output in stdout/stderr.
-
-            Use the GitHub CLI (gh) to post the comment. The trigger event is
-            ${{ github.event_name }}.
-
-            If the event is issue_comment, the comment URL is:
-            ${{ github.event.comment.html_url }}
-            If the event is pull_request_review_comment, the comment URL is:
-            ${{ github.event.comment.html_url }}
-            If the event is issues, the issue URL is:
-            ${{ github.event.issue.html_url }}
-            If the event is pull_request_review, the review URL is:
-            ${{ github.event.review.html_url }}

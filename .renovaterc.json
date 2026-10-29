@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "gitIgnoredAuthors: biome-migrate.yaml commits the migrated biome.jsonc to a Renovate branch as github-actions[bot]; without this, Renovate takes that commit for a manual edit, marks the pull request as edited and stops updating it."
+  ],
+  "extends": ["config:recommended", ":semanticCommitsDisabled"],
+  "addLabels": ["renovate"],
+  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
+  "customManagers": [
+    {
+      "description": "Renovate hints after a comment: `# datasource=<datasource> depName=<depName>`. A trailing ! of a version pinned in .trunk/trunk.yaml is left out of the version.",
+      "customType": "regex",
+      "extractVersionTemplate": "^v?(?<version>.*)$",
+      "managerFilePatterns": ["/^\\.github/workflows/.*\\.ya?ml$/", "/^\\.trunk/trunk\\.yaml$/"],
+      "matchStrings": [
+        "(\\s+|.*?@)(?<currentValue>\\S+?)!?\\s*#\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+registryUrl=(?<registryUrl>\\S+))?\\s*\\n"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    },
+    {
+      "description": "The upstream version in a PKGBUILD: `pkgver=<version> # datasource=<datasource> depName=<depName>`. It needs a regex of its own, as the generic one above would take `pkgver=` for a part of the version.",
+      "customType": "regex",
+      "extractVersionTemplate": "^v?(?<version>.*)$",
+      "managerFilePatterns": ["/(^|/)PKGBUILD$/"],
+      "matchStrings": [
+        "pkgver=(?<currentValue>\\S+)\\s*#\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+registryUrl=(?<registryUrl>\\S+))?\\s*\\n"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    }
+  ]
+}
