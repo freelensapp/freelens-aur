@@ -98,7 +98,7 @@ lint:
     # instead, and biome-migrate.yaml migrates biome.jsonc on its branch.
     - biome@2.6.3! # datasource=npm depName=@biomejs/biome
     - git-diff-check
-    - hadolint@2.14.0
+    - hadolint@2.15.1
     - shellcheck@0.11.0
     - shfmt@3.14.1
     - trufflehog@3.99.7
