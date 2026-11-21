@@ -44,8 +44,9 @@ workflow.
     auto-upgrades via Trunk.
   - `biome-migrate.yaml` — On a Renovate pull request that changes
     `.trunk/trunk.yaml` or `biome.jsonc`, runs `biome migrate` for the Biome
-    version pinned in `.trunk/trunk.yaml` and commits the migrated
-    `biome.jsonc` to the same branch.
+    version pinned in `.trunk/trunk.yaml`, then `biome format` with the same
+    version, and commits the migrated `biome.jsonc` and the reformatted files
+    to the same branch.
 - **`.github/actions/aur/`** — Composite action (`Dockerfile`,
   `action.yml`, `entrypoint.sh`) that runs `updpkgsums` inside an
   Arch Linux container. Used by the `updpkgsums.yml` workflow.

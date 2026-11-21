@@ -2,10 +2,12 @@ name: Automated biome migrate
 
 # Renovate bumps the Biome version (the linter in .trunk/trunk.yaml) but cannot
 # run `biome migrate`, so the schema and any renamed rules in biome.jsonc stay
-# behind. This workflow migrates the config on the Renovate branch itself, so
-# that the bump and its migration land in one pull request instead of a second
-# one against main. The paths are a coarse filter: on a branch that does not
-# change the Biome version, the migration finds nothing to do.
+# behind, and the files keep the formatting of the old version, which the new
+# one may change. This workflow migrates the config and formats the files on
+# the Renovate branch itself, so that the bump and its migration land in one
+# pull request instead of a second one against main. The paths are a coarse
+# filter: on a branch that does not change the Biome version, the migration
+# and the formatting find nothing to do.
 on:
   pull_request:
     branches:
@@ -32,7 +34,7 @@ jobs:
 
     env:
       DO_NOT_TRACK: "1"
-      MESSAGE: Migrate biome.jsonc to the new Biome version
+      MESSAGE: Migrate to the new Biome version
 
     steps:
       # The Renovate branch is checked out at its head rather than merged with
@@ -45,35 +47,43 @@ jobs:
 
       # The version is the one Trunk runs, pinned with a trailing ! in
       # .trunk/trunk.yaml. npx comes with the Node of the runner image.
-      - name: Run biome migrate
+      - name: Find the Biome version
         run: |-
           BIOME_VERSION=$(perl -ne 'print $1 if /^\s*-\s*biome@([^!\s]+)/' .trunk/trunk.yaml)
           if [[ -z $BIOME_VERSION ]]; then
             echo "::error::No biome version in .trunk/trunk.yaml" >&2
             exit 1
           fi
-          npx --yes "@biomejs/biome@${BIOME_VERSION}" migrate --write
+          echo "BIOME_VERSION=${BIOME_VERSION}" | tee -a "$GITHUB_ENV"
+
+      - name: Run biome migrate
+        run: npx --yes "@biomejs/biome@${BIOME_VERSION}" migrate --write
+
+      # After the migration, so that the new version formats with the migrated
+      # config, biome.jsonc included.
+      - name: Run biome format
+        run: npx --yes "@biomejs/biome@${BIOME_VERSION}" format --write --no-errors-on-unmatched .
 
       - name: Check for changes
         run: |-
-          if git diff --exit-code --stat -- biome.jsonc; then
+          if git diff --exit-code --stat; then
             echo "changes=false" | tee -a "$GITHUB_ENV"
           else
             echo "changes=true" | tee -a "$GITHUB_ENV"
           fi
 
-      # A run on a commit this job made must never find the config to migrate
-      # again; if it does, committing once more would only loop.
+      # A run on a commit this job made must never find anything to migrate or
+      # format again; if it does, committing once more would only loop.
       - name: Refuse to migrate twice
         if: env.changes == 'true'
         run: |-
           if [ "$(git log -1 --format=%s)" = "$MESSAGE" ]; then
-            echo "::error::biome.jsonc still needs migrating after it was migrated and committed." >&2
+            echo "::error::The files still change after they were migrated, formatted and committed." >&2
             exit 1
           fi
 
       # The push uses GH_TOKEN rather than the workflow token, so that it starts
-      # the checks again on the migrated config. If the branch moved meanwhile,
+      # the checks again on the migrated files. If the branch moved meanwhile,
       # the push is rejected as non-fast-forward, and the run on the newer
       # commit takes over. The checkout of the head SHA leaves HEAD detached,
       # so the push names the branch itself.
@@ -83,6 +93,6 @@ jobs:
         with:
           github_token: ${{ secrets.GH_TOKEN }}
           default_author: github_actions
-          add: biome.jsonc
+          add: --update
           message: ${{ env.MESSAGE }}
           push: origin HEAD:refs/heads/${{ github.head_ref }}
