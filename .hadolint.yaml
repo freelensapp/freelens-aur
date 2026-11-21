@@ -1,4 +1,7 @@
-# Following source doesn't work in most setups
 ignored:
+  # Following source doesn't work in most setups
   - SC1090
   - SC1091
+  # The image runs only as the container of a GitHub action, which never
+  # resolves the user on the host, so the name of the user is fine.
+  - DL3066
