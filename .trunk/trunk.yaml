@@ -96,7 +96,7 @@ lint:
     - actionlint@1.17.1
     # The trailing ! keeps trunk upgrade off Biome: Renovate bumps it
     # instead, and biome-migrate.yaml migrates biome.jsonc on its branch.
-    - biome@2.6.8! # datasource=npm depName=@biomejs/biome
+    - biome@2.6.9! # datasource=npm depName=@biomejs/biome
     - git-diff-check
     - hadolint@2.15.1
     - shellcheck@0.11.0
